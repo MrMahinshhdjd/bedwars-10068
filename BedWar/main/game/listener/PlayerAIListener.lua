@@ -22,7 +22,8 @@ function PlayerAIListener.onDynamicAttrInit(attr)
     local robotId = attr.robotId
     local teamId = attr.team
     local name = tostring(attr.name)
-    if AIManager:getAIByUserId(platformId) ~= nil then
+    ---脚本召唤的AI已在创建流程中，跳过事件防止重复创建
+    if AITeamManager:isPendingSummon(platformId) or AIManager:getAIByUserId(platformId) ~= nil then
         return
     end
     index = index + 1
