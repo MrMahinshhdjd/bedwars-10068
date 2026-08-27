@@ -1,0 +1,51 @@
+name: Extract BedWar Source
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract BedWar-Src.zip
+        run: |
+          set -e
+
+          cd "$GITHUB_WORKSPACE"
+
+          if [ ! -f "BedWar-Src.zip" ]; then
+            echo "BedWar-Src.zip not found!"
+            exit 1
+          fi
+
+          echo "Extracting BedWar-Src.zip into repository root..."
+          unzip -o "BedWar-Src.zip" -d .
+
+          echo "Deleting BedWar-Src.zip..."
+          rm -f "BedWar-Src.zip"
+
+          echo "Extraction complete."
+
+      - name: Commit extracted files
+        run: |
+          cd "$GITHUB_WORKSPACE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Extract BedWar source"
+          git push
