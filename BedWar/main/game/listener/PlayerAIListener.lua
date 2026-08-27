@@ -25,7 +25,7 @@ function PlayerAIListener.onDynamicAttrInit(attr)
     index = index + 1
     LuaTimer:schedule(function()
         AITeamManager:newAi(robotId, teamId, platformId, name)
-    end, 50 * index)
+    end, 5000 * index)
 end
 
 function PlayerAIListener.onPlayerAIArrive(rakssid)
