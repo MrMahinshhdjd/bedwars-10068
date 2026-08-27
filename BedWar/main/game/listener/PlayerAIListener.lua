@@ -22,10 +22,13 @@ function PlayerAIListener.onDynamicAttrInit(attr)
     local robotId = attr.robotId
     local teamId = attr.team
     local name = tostring(attr.name)
+    if AIManager:getAIByUserId(platformId) ~= nil then
+        return
+    end
     index = index + 1
     LuaTimer:schedule(function()
         AITeamManager:newAi(robotId, teamId, platformId, name)
-    end, 5000 * index)
+    end, 50 * index)
 end
 
 function PlayerAIListener.onPlayerAIArrive(rakssid)

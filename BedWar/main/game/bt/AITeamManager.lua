@@ -8,6 +8,10 @@ AITeamManager = {}
 
 local Teams = {}
 
+local SUMMON_INTERVAL = 5000 ---自动召唤AI的间隔(毫秒)
+local summonTimerKey = nil
+local summonIndex = 0
+
 function AITeamManager:newAi(groupId, teamId, platformId, name)
     local team = Teams[tostring(teamId)] or {}
     team.teamId = teamId
@@ -31,6 +35,61 @@ function AITeamManager:addAItoTeam(team, platformId, name)
             break
         end
     end
+end
+
+function AITeamManager:startAutoSummon()
+    if summonTimerKey ~= nil then
+        return
+    end
+    summonTimerKey = LuaTimer:scheduleTimer(function()
+        AITeamManager:onAutoSummon()
+    end, SUMMON_INTERVAL)
+end
+
+function AITeamManager:stopAutoSummon()
+    if summonTimerKey ~= nil then
+        LuaTimer:cancel(summonTimerKey)
+        summonTimerKey = nil
+    end
+end
+
+function AITeamManager:onAutoSummon()
+    if GameMatch.hasEndGame or not GameMatch.allowPvp then
+        AITeamManager:stopAutoSummon()
+        return
+    end
+    if PlayerManager:getPlayerCount() >= PlayerManager:getRoomMaxPlayer() then
+        return
+    end
+    ---选择还有未使用AI配置、且存活AI最少的队伍
+    local targetTeam
+    local minCount
+    for _, team in pairs(Teams) do
+        local gameTeam = GameMatch.Teams[team.teamId] or GameMatch.Teams[tonumber(team.teamId) or -1]
+        if team.configs ~= nil and gameTeam ~= nil and gameTeam:isDeath() == false then
+            local hasUnused = false
+            for _, config in pairs(team.configs) do
+                if not config.isUsed then
+                    hasUnused = true
+                    break
+                end
+            end
+            if hasUnused then
+                local count = #AIManager:getAIsByTeamId(team.teamId)
+                if minCount == nil or count < minCount then
+                    minCount = count
+                    targetTeam = team
+                end
+            end
+        end
+    end
+    if targetTeam == nil then
+        AITeamManager:stopAutoSummon()
+        return
+    end
+    summonIndex = summonIndex + 1
+    ---负数userId，避免与真实玩家冲突
+    AITeamManager:addAItoTeam(targetTeam, -summonIndex, "AI" .. summonIndex)
 end
 
 function AITeamManager:onAIDie(player)

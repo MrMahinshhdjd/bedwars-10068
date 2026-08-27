@@ -67,6 +67,7 @@ function GameMatch:startMatch()
     else
         MessagesManage:sendSystemTipsToAll(IMessages:msgGameStart())
         GameTimeTask:start()
+        AITeamManager:startAutoSummon()
     end
 
     PropBlockConfig:createBedProtect()
@@ -122,6 +123,7 @@ function GameMatch:endMatch()
 
     ReportUtil.reportAIGameEndTime()
 
+    AITeamManager:stopAutoSummon()
     AIManager:onGameOver()
 
     HostApi.sendPlaySound(0, 10003)
