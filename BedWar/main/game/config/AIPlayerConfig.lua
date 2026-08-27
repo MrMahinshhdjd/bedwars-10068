@@ -79,6 +79,17 @@ function AIPlayerConfig:getConfigs(groupId, teamId)
     return configs
 end
 
+---只按队伍ID获取AI配置（不区分groupId），用于脚本主动召唤AI
+function AIPlayerConfig:getConfigsByTeamId(teamId)
+    local configs = {}
+    for _, config in pairs(self.Config) do
+        if tonumber(config.teamId) == tonumber(teamId) then
+            table.insert(configs, config)
+        end
+    end
+    return configs
+end
+
 function AIPlayerConfig:randomOneConfig()
     if AIPlayerConfig.number == 0 then
         return

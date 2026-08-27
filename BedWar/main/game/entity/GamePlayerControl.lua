@@ -17,7 +17,22 @@ function GamePlayerControl:ctor(platformId, name, teamId, config)
     end) --entityId
     self.rakssid = self.entity:getRaknetID()
     self.userId = platformId
+    self:tryInitAI(teamId, config, 0)
+end
+
+---等待AI账号登录完成后再初始化，登录是异步的，luaPlayer可能还没创建
+function GamePlayerControl:tryInitAI(teamId, config, retryCount)
     self.luaPlayer = PlayerManager:getPlayerByUserId(self.userId)
+    if self.luaPlayer == nil then
+        if retryCount < 100 then
+            LuaTimer:schedule(function()
+                self:tryInitAI(teamId, config, retryCount + 1)
+            end, 100)
+        else
+            LogUtil.log("[SCRIPT_EXCEPTION] GamePlayerControl init timeout, userId = " .. tostring(self.userId), LogUtil.LogLevel.Error)
+        end
+        return
+    end
     self.luaPlayer:initDBDataFinished()
     self:updateConfig(config)
     self:setTeamId(teamId)

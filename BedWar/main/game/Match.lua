@@ -32,10 +32,14 @@ function GameMatch:init()
     end
     WaitingPlayerTask:start()
     TreasureChallenge:setSeasonRefreshTimer()
+    ---等待阶段每5秒召唤一个AI，填满房间
+    AITeamManager:startAutoSummon()
 end
 
 function GameMatch:prepareMatch()
     self.hasStartGame = true
+    ---游戏开始准备后新登录会被拒绝，停止召唤AI
+    AITeamManager:stopAutoSummon()
     GamePrepareTask:start()
     GamePrepareTask:onTick(1)
 end
@@ -122,6 +126,7 @@ function GameMatch:endMatch()
 
     ReportUtil.reportAIGameEndTime()
 
+    AITeamManager:stopAutoSummon()
     AIManager:onGameOver()
 
     HostApi.sendPlaySound(0, 10003)

@@ -8,6 +8,11 @@ AITeamManager = {}
 
 local Teams = {}
 
+local SUMMON_INTERVAL = 5000 ---自动召唤AI的间隔(毫秒)
+local summonTimerKey = nil
+local summonIndex = 0
+local pendingSummon = {} ---脚本召唤中的AI账号，避免登录事件重复创建
+
 function AITeamManager:newAi(groupId, teamId, platformId, name)
     local team = Teams[tostring(teamId)] or {}
     team.teamId = teamId
@@ -26,10 +31,93 @@ end
 function AITeamManager:addAItoTeam(team, platformId, name)
     for _, config in pairs(team.configs) do
         if not config.isUsed then
-            config.ai = GamePlayerAI.new(platformId, name, team.teamId, config)
+            ---先标记占用，防止登录事件同步触发时递归召唤
             config.isUsed = true
+            config.ai = GamePlayerAI.new(platformId, name, team.teamId, config)
             break
         end
+    end
+end
+
+---队伍没有AI配置时（没有机器人玩家加入过），按队伍ID从配置表加载
+function AITeamManager:ensureTeam(teamId)
+    local team = Teams[tostring(teamId)]
+    if team == nil then
+        team = { teamId = teamId }
+        team.configs = TableUtil.copyTable(AIPlayerConfig:getConfigsByTeamId(teamId))
+        table.sort(team.configs, function(a, b)
+            return tonumber(a.weight) < tonumber(b.weight)
+        end)
+        Teams[tostring(teamId)] = team
+    end
+    return team
+end
+
+function AITeamManager:isPendingSummon(userId)
+    return pendingSummon[tostring(userId)] == true
+end
+
+function AITeamManager:startAutoSummon()
+    if summonTimerKey ~= nil then
+        return
+    end
+    summonTimerKey = LuaTimer:scheduleTimer(function()
+        AITeamManager:onAutoSummon()
+    end, SUMMON_INTERVAL)
+end
+
+function AITeamManager:stopAutoSummon()
+    if summonTimerKey ~= nil then
+        LuaTimer:cancel(summonTimerKey)
+        summonTimerKey = nil
+    end
+end
+
+function AITeamManager:onAutoSummon()
+    ---游戏开始准备后不再允许新玩家登录，停止召唤
+    if GameMatch.hasEndGame or GameMatch.hasStartGame then
+        AITeamManager:stopAutoSummon()
+        return
+    end
+    local maxPlayer = PlayerManager:getRoomMaxPlayer() or 0
+    if maxPlayer > 0 and PlayerManager:getPlayerCount() >= maxPlayer then
+        return
+    end
+    ---选择还有未使用AI配置、且存活AI最少的队伍
+    local targetTeam
+    local minCount
+    for teamId, gameTeam in pairs(GameMatch.Teams) do
+        if gameTeam:isDeath() == false then
+            local team = AITeamManager:ensureTeam(teamId)
+            local hasUnused = false
+            for _, config in pairs(team.configs) do
+                if not config.isUsed then
+                    hasUnused = true
+                    break
+                end
+            end
+            if hasUnused then
+                local count = #AIManager:getAIsByTeamId(teamId)
+                if minCount == nil or count < minCount then
+                    minCount = count
+                    targetTeam = team
+                end
+            end
+        end
+    end
+    if targetTeam == nil then
+        AITeamManager:stopAutoSummon()
+        return
+    end
+    summonIndex = summonIndex + 1
+    ---负数userId，避免与真实玩家冲突
+    local platformId = -summonIndex
+    pendingSummon[tostring(platformId)] = true
+    local ok, err = pcall(function()
+        AITeamManager:addAItoTeam(targetTeam, platformId, "AI" .. summonIndex)
+    end)
+    if not ok then
+        LogUtil.log("[SCRIPT_EXCEPTION] auto summon ai failed: " .. tostring(err), LogUtil.LogLevel.Error)
     end
 end
 
